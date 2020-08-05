@@ -31,7 +31,32 @@ compute_coverage.default <- function(x, shift = 0L, width = NULL, weight = 1L, .
 }
 
 
+
+#' @export
+compute_coverage.GroupedGenomicRanges <- function(.data, shift = 0L, width = NULL, weight = 1L, ...) {
+    #split out the dataframe by group
+    splitted_list <- S4Vectors::split(.data@delegate, .data@group_indices@values)
+    seqinfo = .data@delegate@seqinfo #store the sequence information for us to reset
+
+    #compute the coverage for each individual group
+    coverage_list <- lapply(splitted_list, function(x) as_ranges(coverage(x, shift, width, weight, ...)))
+
+    #convenience function for setting the sequence information 
+    set_seqinfo <- function(x, info) {
+    seqinfo(x) <- info
+    x
+    }
+    #push the lists back together making sure they keep the same seqinfo
+    merged_list <- as_granges(GRangesList(lapply(coverage_list, function(x) set_sequences(x, seqinfo))))
+
+    #remove the group_name column and return the grouped Genomic Ranges
+    merged_list$group_name <- NULL
+    group_by(merged_list, group)
+}
+
+
 setMethod("coverage", "DelegatingGenomicRanges",
           function(x, shift = 0L, width = NULL, weight = 1L, ...) {
             coverage(load_delegate(x), shift, width, weight, ...)
           })
+
